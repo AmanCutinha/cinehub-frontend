@@ -1,22 +1,26 @@
 export interface Movie {
-  id: string;
+  id: number;
   title: string;
-  genre: string;
-  duration: number;
-  rating: number;
-  poster: string;
-  description: string;
+  genre?: string;
+  rating?: number;
+  description?: string;
+  releaseDate?: string;
+  durationMinutes?: number;
+  language?: string;
+  posterUrl?: string;
 }
 
+
 export interface Showtime {
-  id: string;
-  movieId: string;
-  time: string;
-  date: string;
-  availableSeats: number;
+  id: number;
+  movie: Movie;
+  date: string;       // e.g. "2025-10-22"
+  time: string;       // e.g. "19:30:00"
   totalSeats: number;
+  availableSeats: number;
   price: number;
 }
+
 
 export interface Reservation {
   id: string;

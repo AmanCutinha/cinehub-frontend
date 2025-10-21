@@ -1,36 +1,59 @@
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { useMovies } from '@/contexts/MovieContext';
-import { Navbar } from '@/components/Navbar';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Ticket, Calendar, Clock, DollarSign } from 'lucide-react';
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Navbar } from "@/components/Navbar";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Ticket, Calendar, DollarSign } from "lucide-react";
+import { getBookingsByUser } from "@/services/bookingService";
+import { toast } from "sonner";
+
+interface Booking {
+  id: number;
+  userEmail: string;
+  movie: {
+    title: string;
+    genre: string;
+    rating: number;
+  };
+  seats: number;
+  totalPrice: number;
+  bookingTime: string;
+}
 
 const UserDashboard = () => {
-  const { user } = useAuth();
   const navigate = useNavigate();
-  const { getUserReservations, movies, showtimes } = useMovies();
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const userEmail = "aman@example.com"; // temporary placeholder (will be dynamic once Auth is done)
 
-  if (!user) {
-    navigate('/auth?mode=login');
-    return null;
-  }
+  useEffect(() => {
+    const fetchUserBookings = async () => {
+      try {
+        const data = await getBookingsByUser(userEmail);
+        setBookings(data);
+      } catch (error) {
+        toast.error("Failed to load bookings.");
+      }
+    };
+    fetchUserBookings();
+  }, [userEmail]);
 
-  const userReservations = getUserReservations(user.id);
+  const totalSpent = bookings.reduce((sum, b) => sum + b.totalPrice, 0);
+  const uniqueMovies = new Set(bookings.map(b => b.movie.title)).size;
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      
+
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent mb-2">
             My Dashboard
           </h1>
-          <p className="text-muted-foreground">Welcome back, {user.name}!</p>
+          <p className="text-muted-foreground">Welcome back, Aman!</p>
         </div>
 
+        {/* Dashboard Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card className="p-6 bg-gradient-card border-border/50 shadow-card">
             <div className="flex items-center gap-4">
@@ -39,7 +62,7 @@ const UserDashboard = () => {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Bookings</p>
-                <p className="text-2xl font-bold text-foreground">{userReservations.length}</p>
+                <p className="text-2xl font-bold text-foreground">{bookings.length}</p>
               </div>
             </div>
           </Card>
@@ -51,9 +74,7 @@ const UserDashboard = () => {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Movies Watched</p>
-                <p className="text-2xl font-bold text-foreground">
-                  {new Set(userReservations.map(r => r.movieId)).size}
-                </p>
+                <p className="text-2xl font-bold text-foreground">{uniqueMovies}</p>
               </div>
             </div>
           </Card>
@@ -65,41 +86,40 @@ const UserDashboard = () => {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Spent</p>
-                <p className="text-2xl font-bold text-foreground">
-                  ${userReservations.reduce((sum, r) => sum + r.totalPrice, 0).toFixed(2)}
-                </p>
+                <p className="text-2xl font-bold text-foreground">₹{totalSpent.toFixed(2)}</p>
               </div>
             </div>
           </Card>
         </div>
 
+        {/* Bookings Table */}
         <Card className="p-6 bg-card/50 border-border/50 shadow-card">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-foreground">My Reservations</h2>
-            <Button variant="cinema" onClick={() => navigate('/')}>
+            <h2 className="text-2xl font-bold text-foreground">My Bookings</h2>
+            <Button variant="cinema" onClick={() => navigate("/")}>
               Book More Tickets
             </Button>
           </div>
 
-          {userReservations.length > 0 ? (
+          {bookings.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Movie</TableHead>
-                  <TableHead>Showtime</TableHead>
+                  <TableHead>Genre</TableHead>
                   <TableHead>Seats</TableHead>
                   <TableHead>Total Price</TableHead>
-                  <TableHead>Booking Date</TableHead>
+                  <TableHead>Booking Time</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {userReservations.map((reservation) => (
-                  <TableRow key={reservation.id}>
-                    <TableCell className="font-medium">{reservation.movieTitle}</TableCell>
-                    <TableCell>{reservation.showtime}</TableCell>
-                    <TableCell>{reservation.seats} seat(s)</TableCell>
-                    <TableCell>${reservation.totalPrice.toFixed(2)}</TableCell>
-                    <TableCell>{new Date(reservation.bookingDate).toLocaleDateString()}</TableCell>
+                {bookings.map((b) => (
+                  <TableRow key={b.id}>
+                    <TableCell className="font-medium">{b.movie.title}</TableCell>
+                    <TableCell>{b.movie.genre}</TableCell>
+                    <TableCell>{b.seats}</TableCell>
+                    <TableCell>₹{b.totalPrice}</TableCell>
+                    <TableCell>{new Date(b.bookingTime).toLocaleString()}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -107,8 +127,8 @@ const UserDashboard = () => {
           ) : (
             <div className="text-center py-12">
               <Ticket className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
-              <p className="text-xl text-muted-foreground mb-4">No reservations yet</p>
-              <Button variant="cinema" onClick={() => navigate('/')}>
+              <p className="text-xl text-muted-foreground mb-4">No bookings yet</p>
+              <Button variant="cinema" onClick={() => navigate("/")}>
                 Browse Movies
               </Button>
             </div>

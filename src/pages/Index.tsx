@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { testBackendConnection } from '@/services/api';
 import { MovieCard } from '@/components/MovieCard';
 import { Navbar } from '@/components/Navbar';
 import { useMovies } from '@/contexts/MovieContext';
@@ -7,26 +8,53 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Search, Filter } from 'lucide-react';
 
 const Index = () => {
-  const { movies, getMovieShowtimes } = useMovies();
+  const { movies, getMovieShowtimes, fetchShowtimes } = useMovies();
   const [searchTerm, setSearchTerm] = useState('');
   const [genreFilter, setGenreFilter] = useState('all');
   const [ratingFilter, setRatingFilter] = useState('all');
 
+  // ----- backend status -----
+  const [backendStatus, setBackendStatus] = useState<string>('Checking backend connection...');
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const status = await testBackendConnection();
+        if (mounted) setBackendStatus(status);
+      } catch (err) {
+        if (mounted) setBackendStatus('⚠️ Failed to connect to backend');
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Fetch showtimes for all movies when movies load
+  useEffect(() => {
+    if (movies.length > 0) {
+      movies.forEach((movie) => fetchShowtimes(movie.id));
+    }
+  }, [movies, fetchShowtimes]);
+
   const genres = useMemo(() => {
-    const uniqueGenres = Array.from(new Set(movies.map(m => m.genre)));
+    const uniqueGenres = Array.from(new Set(movies.map((m) => m.genre).filter(Boolean)));
     return ['all', ...uniqueGenres];
   }, [movies]);
 
   const filteredMovies = useMemo(() => {
-    return movies.filter(movie => {
-      const matchesSearch = movie.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          movie.description.toLowerCase().includes(searchTerm.toLowerCase());
+    return movies.filter((movie) => {
+      const matchesSearch =
+        (movie.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (movie.description || '').toLowerCase().includes(searchTerm.toLowerCase());
       const matchesGenre = genreFilter === 'all' || movie.genre === genreFilter;
-      const matchesRating = ratingFilter === 'all' || 
-                          (ratingFilter === 'high' && movie.rating >= 8.0) ||
-                          (ratingFilter === 'medium' && movie.rating >= 6.0 && movie.rating < 8.0) ||
-                          (ratingFilter === 'low' && movie.rating < 6.0);
-      
+      const matchesRating =
+        ratingFilter === 'all' ||
+        (ratingFilter === 'high' && movie.rating >= 8.0) ||
+        (ratingFilter === 'medium' && movie.rating >= 6.0 && movie.rating < 8.0) ||
+        (ratingFilter === 'low' && movie.rating < 6.0);
+
       return matchesSearch && matchesGenre && matchesRating;
     });
   }, [movies, searchTerm, genreFilter, ratingFilter]);
@@ -34,16 +62,24 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      
+
       {/* Hero Section */}
       <div className="relative bg-gradient-hero py-20 px-4 mb-12">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1920&h=600&fit=crop')] bg-cover bg-center opacity-20" />
+        <div
+          className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1920&h=600&fit=crop')] bg-cover bg-center opacity-20"
+          aria-hidden
+        />
         <div className="container mx-auto relative z-10">
           <h1 className="text-5xl md:text-6xl font-bold text-center mb-4 bg-gradient-primary bg-clip-text text-transparent">
             Welcome to CineHub
           </h1>
           <p className="text-xl text-center text-muted-foreground max-w-2xl mx-auto">
             Book your favorite movies with ease. Enjoy the best cinema experience.
+          </p>
+
+          {/* Backend connection status */}
+          <p className="text-center text-lg font-semibold mt-6 text-emerald-400">
+            {backendStatus}
           </p>
         </div>
       </div>
@@ -55,7 +91,7 @@ const Index = () => {
             <Filter className="w-5 h-5 text-accent" />
             <h2 className="text-lg font-semibold text-foreground">Filter Movies</h2>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -73,7 +109,7 @@ const Index = () => {
                 <SelectValue placeholder="Select genre" />
               </SelectTrigger>
               <SelectContent>
-                {genres.map(genre => (
+                {genres.map((genre) => (
                   <SelectItem key={genre} value={genre}>
                     {genre === 'all' ? 'All Genres' : genre}
                   </SelectItem>
@@ -100,12 +136,8 @@ const Index = () => {
       <div className="container mx-auto px-4 pb-12">
         {filteredMovies.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredMovies.map(movie => (
-              <MovieCard 
-                key={movie.id} 
-                movie={movie} 
-                showtimes={getMovieShowtimes(movie.id)}
-              />
+            {filteredMovies.map((movie) => (
+              <MovieCard key={movie.id} movie={movie} showtimes={getMovieShowtimes(movie.id)} />
             ))}
           </div>
         ) : (
