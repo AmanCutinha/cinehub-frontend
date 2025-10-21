@@ -1,22 +1,20 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Film } from 'lucide-react';
-import { toast } from 'sonner';
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
+import { Film } from "lucide-react";
+import { toast } from "sonner";
 
 const Auth = () => {
   const [searchParams] = useSearchParams();
-  const mode = searchParams.get('mode') || 'login';
-  const [isLogin, setIsLogin] = useState(mode === 'login');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [role, setRole] = useState<'user' | 'admin'>('user');
+  const mode = searchParams.get("mode") || "login";
+  const [isLogin, setIsLogin] = useState(mode === "login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const { login, register, isAuthenticated, user } = useAuth();
@@ -24,29 +22,30 @@ const Auth = () => {
 
   useEffect(() => {
     if (isAuthenticated && user) {
-      navigate(user.role === 'admin' ? '/admin' : '/user');
+      toast.success(`Welcome, ${user.name}!`);
+      navigate("/"); // redirect to home after login/register
     }
   }, [isAuthenticated, user, navigate]);
 
   const validateForm = () => {
     if (!email.trim()) {
-      toast.error('Please enter your email');
+      toast.error("Please enter your email");
       return false;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      toast.error('Please enter a valid email address');
+      toast.error("Please enter a valid email address");
       return false;
     }
     if (!password.trim()) {
-      toast.error('Please enter your password');
+      toast.error("Please enter your password");
       return false;
     }
     if (password.length < 6) {
-      toast.error('Password must be at least 6 characters');
+      toast.error("Password must be at least 6 characters");
       return false;
     }
     if (!isLogin && !name.trim()) {
-      toast.error('Please enter your name');
+      toast.error("Please enter your name");
       return false;
     }
     return true;
@@ -54,29 +53,30 @@ const Auth = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!validateForm()) return;
 
+    if (!validateForm()) return;
     setIsLoading(true);
 
     try {
       if (isLogin) {
-        const success = await login(email, password, role);
+        const success = await login(email, password);
         if (success) {
-          toast.success('Login successful!');
+          toast.success("Login successful!");
+          navigate("/");
         } else {
-          toast.error('Invalid credentials. Please try again.');
+          toast.error("Invalid credentials. Please try again.");
         }
       } else {
-        const success = await register(email, password, name, role);
+        const success = await register(name, email, password);
         if (success) {
-          toast.success('Registration successful!');
+          toast.success("Registration successful!");
+          navigate("/");
         } else {
-          toast.error('Email already exists. Please login instead.');
+          toast.error("Registration failed. Try a different email.");
         }
       }
-    } catch (error) {
-      toast.error('An error occurred. Please try again.');
+    } catch (err) {
+      toast.error("Something went wrong. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -84,15 +84,15 @@ const Auth = () => {
 
   const toggleMode = () => {
     setIsLogin(!isLogin);
-    setEmail('');
-    setPassword('');
-    setName('');
+    setEmail("");
+    setPassword("");
+    setName("");
   };
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1920&h=1080&fit=crop')] bg-cover bg-center opacity-10" />
-      
+
       <Card className="w-full max-w-md relative z-10 bg-card/95 backdrop-blur-sm shadow-cinema border-border/50">
         <div className="p-8 space-y-6">
           <div className="flex flex-col items-center gap-4">
@@ -104,7 +104,7 @@ const Auth = () => {
                 CineHub
               </h1>
               <p className="text-muted-foreground mt-2">
-                {isLogin ? 'Welcome back!' : 'Join us today!'}
+                {isLogin ? "Welcome back!" : "Join CineHub today!"}
               </p>
             </div>
           </div>
@@ -120,7 +120,7 @@ const Auth = () => {
                   onChange={(e) => setName(e.target.value)}
                   placeholder="John Doe"
                   className="bg-background/50"
-                  required={!isLogin}
+                  required
                 />
               </div>
             )}
@@ -151,27 +151,14 @@ const Auth = () => {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="role">Account Type</Label>
-              <Select value={role} onValueChange={(value: 'user' | 'admin') => setRole(value)}>
-                <SelectTrigger id="role" className="bg-background/50">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="user">User</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <Button 
-              type="submit" 
-              variant="cinema" 
-              className="w-full" 
+            <Button
+              type="submit"
+              variant="cinema"
+              className="w-full"
               size="lg"
               disabled={isLoading}
             >
-              {isLoading ? 'Please wait...' : (isLogin ? 'Login' : 'Sign Up')}
+              {isLoading ? "Please wait..." : isLogin ? "Login" : "Sign Up"}
             </Button>
           </form>
 
@@ -181,9 +168,9 @@ const Auth = () => {
               onClick={toggleMode}
               className="text-sm text-muted-foreground hover:text-accent transition-colors"
             >
-              {isLogin ? "Don't have an account? " : 'Already have an account? '}
+              {isLogin ? "Don't have an account? " : "Already have an account? "}
               <span className="text-accent font-semibold">
-                {isLogin ? 'Sign Up' : 'Login'}
+                {isLogin ? "Sign Up" : "Login"}
               </span>
             </button>
           </div>

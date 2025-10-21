@@ -3,6 +3,7 @@ import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Clock, Star, Calendar } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface MovieCardProps {
   movie: Movie;
@@ -11,6 +12,15 @@ interface MovieCardProps {
 
 export const MovieCard = ({ movie, showtimes }: MovieCardProps) => {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+
+  const handleBooking = (showtimeId: number) => {
+    if (!isAuthenticated) {
+      navigate("/auth?mode=login");
+    } else {
+      navigate(`/booking/${movie.id}/${showtimeId}`);
+    }
+  };
 
   return (
     <Card className="overflow-hidden bg-card border border-border/50 shadow-card hover:shadow-xl hover:scale-[1.02] transition-all duration-300">
@@ -61,10 +71,10 @@ export const MovieCard = ({ movie, showtimes }: MovieCardProps) => {
                   key={showtime.id}
                   variant="outline"
                   size="sm"
-                  onClick={() => navigate(`/booking/${movie.id}/${showtime.id}`)}
+                  onClick={() => handleBooking(showtime.id)}
                   className="text-xs hover:bg-accent hover:text-accent-foreground transition-colors"
                 >
-                  {showtime.time?.slice(0, 5)} {/* Show time only, like "18:30" */}
+                  {showtime.time?.slice(0, 5) || "N/A"}
                 </Button>
               ))
             ) : (

@@ -1,64 +1,55 @@
-import { Film, LogOut, User } from 'lucide-react';
-import { Button } from './ui/button';
-import { useAuth } from '@/contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Film } from "lucide-react";
 
 export const Navbar = () => {
-  const { user, logout, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
     logout();
-    navigate('/');
+    navigate("/auth?mode=login");
   };
 
   return (
-    <nav className="bg-card/80 backdrop-blur-sm border-b border-border/50 sticky top-0 z-50">
-      <div className="container mx-auto px-4 py-4">
-        <div className="flex items-center justify-between">
-          <div 
-            className="flex items-center gap-2 cursor-pointer group" 
-            onClick={() => navigate('/')}
-          >
-            <div className="bg-gradient-primary p-2 rounded-lg shadow-cinema group-hover:shadow-xl transition-all">
-              <Film className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <span className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-              CineHub
-            </span>
-          </div>
+    <nav className="w-full bg-card/70 backdrop-blur-md border-b border-border/50 shadow-sm sticky top-0 z-50">
+      <div className="container mx-auto flex items-center justify-between py-3 px-4">
+        <div
+          className="flex items-center gap-2 cursor-pointer"
+          onClick={() => navigate("/")}
+        >
+          <Film className="w-6 h-6 text-accent" />
+          <h1 className="font-bold text-lg text-foreground">CineHub</h1>
+        </div>
 
-          <div className="flex items-center gap-4">
-            {isAuthenticated ? (
-              <>
-                <Button
-                  variant="ghost"
-                  onClick={() => navigate(user?.role === 'admin' ? '/admin' : '/user')}
-                  className="gap-2"
-                >
-                  <User className="w-4 h-4" />
-                  {user?.name}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleLogout}
-                  className="gap-2"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Logout
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button variant="ghost" onClick={() => navigate('/auth?mode=login')}>
-                  Login
-                </Button>
-                <Button variant="cinema" onClick={() => navigate('/auth?mode=register')}>
-                  Sign Up
-                </Button>
-              </>
-            )}
-          </div>
+        <div className="flex items-center gap-4">
+          <Link to="/" className="text-foreground hover:text-accent transition">
+            Home
+          </Link>
+          {isAuthenticated && (
+            <Link
+              to="/user"
+              className="text-foreground hover:text-accent transition"
+            >
+              Dashboard
+            </Link>
+          )}
+
+          {!isAuthenticated ? (
+            <Button variant="cinema" size="sm" onClick={() => navigate("/auth?mode=login")}>
+              Login
+            </Button>
+          ) : (
+            <>
+              <span className="text-sm text-muted-foreground hidden sm:inline">
+                Hi, {user?.name?.split(" ")[0]}
+              </span>
+              <Button variant="outline" size="sm" onClick={handleLogout}>
+                Logout
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </nav>
