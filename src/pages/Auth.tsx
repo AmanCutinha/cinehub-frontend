@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Film } from "lucide-react";
 import { toast } from "sonner";
 
@@ -15,6 +16,7 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [role, setRole] = useState<"user" | "admin">("user");
   const [isLoading, setIsLoading] = useState(false);
 
   const { login, register, isAuthenticated, user } = useAuth();
@@ -23,7 +25,7 @@ const Auth = () => {
   useEffect(() => {
     if (isAuthenticated && user) {
       toast.success(`Welcome, ${user.name}!`);
-      navigate("/"); // redirect to home after login/register
+      navigate(user.role === "admin" ? "/admin" : "/user");
     }
   }, [isAuthenticated, user, navigate]);
 
@@ -53,24 +55,22 @@ const Auth = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!validateForm()) return;
     setIsLoading(true);
 
     try {
       if (isLogin) {
-        const success = await login(email, password);
+        const success = await login(email, password, role);
         if (success) {
           toast.success("Login successful!");
-          navigate("/");
         } else {
           toast.error("Invalid credentials. Please try again.");
         }
       } else {
-        const success = await register(name, email, password);
+        // ✅ FIXED: Correct argument order (name, email, password, role)
+        const success = await register(name, email, password, role);
         if (success) {
           toast.success("Registration successful!");
-          navigate("/");
         } else {
           toast.error("Registration failed. Try a different email.");
         }
@@ -92,7 +92,6 @@ const Auth = () => {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1920&h=1080&fit=crop')] bg-cover bg-center opacity-10" />
-
       <Card className="w-full max-w-md relative z-10 bg-card/95 backdrop-blur-sm shadow-cinema border-border/50">
         <div className="p-8 space-y-6">
           <div className="flex flex-col items-center gap-4">
@@ -151,13 +150,20 @@ const Auth = () => {
               />
             </div>
 
-            <Button
-              type="submit"
-              variant="cinema"
-              className="w-full"
-              size="lg"
-              disabled={isLoading}
-            >
+            <div className="space-y-2">
+              <Label htmlFor="role">Account Type</Label>
+              <Select value={role} onValueChange={(value: "user" | "admin") => setRole(value)}>
+                <SelectTrigger id="role" className="bg-background/50">
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="user">User</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button type="submit" variant="cinema" className="w-full" size="lg" disabled={isLoading}>
               {isLoading ? "Please wait..." : isLogin ? "Login" : "Sign Up"}
             </Button>
           </form>

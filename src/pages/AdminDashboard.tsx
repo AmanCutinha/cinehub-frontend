@@ -1,300 +1,492 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { useMovies } from '@/contexts/MovieContext';
-import { Navbar } from '@/components/Navbar';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Film, Clock, Trash2, Edit, Plus } from 'lucide-react';
-import { toast } from 'sonner';
-import { Movie, Showtime } from '@/types';
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { Navbar } from "@/components/Navbar";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Trash2, Edit, Plus, Loader2 } from "lucide-react";
+import axios from "axios";
+import { toast } from "sonner";
+import { Movie } from "@/types";
+
+const MOVIES_API = "http://localhost:8081/api/movies";
+const SHOWTIMES_API = "http://localhost:8081/api/showtimes";
+const USERS_API = "http://localhost:8081/api/users";
+
+interface Showtime {
+  id: number;
+  movieId: number;
+  date: string;
+  time: string;
+  totalSeats: number;
+  availableSeats: number;
+  price: number;
+}
+
+interface UserType {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+}
 
 const AdminDashboard = () => {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const { movies, showtimes, reservations, addMovie, updateMovie, deleteMovie, addShowtime, updateShowtime, deleteShowtime } = useMovies();
-  
+
+  const [movies, setMovies] = useState<Movie[]>([]);
+  const [showtimes, setShowtimes] = useState<Showtime[]>([]);
+  const [users, setUsers] = useState<UserType[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Movie dialog
   const [isMovieDialogOpen, setIsMovieDialogOpen] = useState(false);
-  const [isShowtimeDialogOpen, setIsShowtimeDialogOpen] = useState(false);
   const [editingMovie, setEditingMovie] = useState<Movie | null>(null);
-  const [editingShowtime, setEditingShowtime] = useState<Showtime | null>(null);
-
-  // Movie form state
   const [movieForm, setMovieForm] = useState({
-    title: '',
-    genre: '',
-    duration: '',
-    rating: '',
-    poster: '',
-    description: '',
+    title: "",
+    genre: "",
+    description: "",
+    durationMinutes: "",
+    rating: "",
+    posterUrl: "",
+    language: "",
+    releaseDate: "",
   });
 
-  // Showtime form state
+  // Showtime dialog
+  const [isShowtimeDialogOpen, setIsShowtimeDialogOpen] = useState(false);
+  const [editingShowtime, setEditingShowtime] = useState<Showtime | null>(null);
   const [showtimeForm, setShowtimeForm] = useState({
-    movieId: '',
-    time: '',
-    date: '',
-    totalSeats: '',
-    price: '',
+    movieId: "",
+    date: "",
+    time: "",
+    totalSeats: "",
+    availableSeats: "",
+    price: "",
   });
 
-  if (!user || user.role !== 'admin') {
-    navigate('/');
-    return null;
-  }
+  // User dialog
+  const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserType | null>(null);
+  const [userForm, setUserForm] = useState({
+    name: "",
+    email: "",
+    password: "",
+    role: "USER",
+  });
 
-  const handleAddMovie = () => {
-    if (!movieForm.title || !movieForm.genre || !movieForm.duration || !movieForm.rating) {
-      toast.error('Please fill all required fields');
+  // Fetch movies & showtimes & users
+  const fetchMovies = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(MOVIES_API);
+      setMovies(res.data);
+    } catch {
+      toast.error("Failed to fetch movies");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchShowtimes = async () => {
+    try {
+      const res = await axios.get(SHOWTIMES_API);
+      setShowtimes(res.data);
+    } catch {
+      toast.error("Failed to fetch showtimes");
+    }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      const res = await axios.get(USERS_API);
+      setUsers(res.data);
+    } catch {
+      toast.error("Failed to fetch users");
+    }
+  };
+
+  useEffect(() => {
+    if (!isAuthenticated || !user || user.role !== "admin") {
+      navigate("/");
+    } else {
+      fetchMovies();
+      fetchShowtimes();
+      fetchUsers();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, user, navigate]);
+
+  // ------------------- MOVIES CRUD (existing working code) -------------------
+  const handleAddOrEditMovie = async () => {
+    if (!movieForm.title || !movieForm.genre || !movieForm.rating) {
+      toast.error("Please fill all required fields");
       return;
     }
 
     const movieData = {
       ...movieForm,
-      duration: parseInt(movieForm.duration),
-      rating: parseFloat(movieForm.rating),
+      durationMinutes: Number(movieForm.durationMinutes) || 0,
+      rating: Number(movieForm.rating) || 0,
     };
 
-    if (editingMovie) {
-      updateMovie(editingMovie.id, movieData);
-      toast.success('Movie updated successfully');
-    } else {
-      addMovie(movieData);
-      toast.success('Movie added successfully');
-    }
+    try {
+      if (editingMovie) {
+        await axios.put(`${MOVIES_API}/${editingMovie.id}`, movieData);
+        toast.success("Movie updated successfully");
+      } else {
+        await axios.post(MOVIES_API, movieData);
+        toast.success("Movie added successfully");
+      }
 
-    setMovieForm({ title: '', genre: '', duration: '', rating: '', poster: '', description: '' });
-    setEditingMovie(null);
-    setIsMovieDialogOpen(false);
+      setMovieForm({
+        title: "",
+        genre: "",
+        description: "",
+        durationMinutes: "",
+        rating: "",
+        posterUrl: "",
+        language: "",
+        releaseDate: "",
+      });
+      setEditingMovie(null);
+      setIsMovieDialogOpen(false);
+      fetchMovies();
+    } catch {
+      toast.error("Error saving movie");
+    }
   };
 
-  const handleEditMovie = (movie: Movie) => {
-    setEditingMovie(movie);
+  const handleEditMovie = (m: Movie) => {
+    setEditingMovie(m);
     setMovieForm({
-      title: movie.title,
-      genre: movie.genre,
-      duration: movie.duration.toString(),
-      rating: movie.rating.toString(),
-      poster: movie.poster,
-      description: movie.description,
+      title: m.title || "",
+      genre: m.genre || "",
+      description: m.description || "",
+      durationMinutes: m.durationMinutes?.toString() || "",
+      rating: m.rating?.toString() || "",
+      posterUrl: m.posterUrl || "",
+      language: m.language || "",
+      releaseDate: m.releaseDate || "",
     });
     setIsMovieDialogOpen(true);
   };
 
-  const handleDeleteMovie = (id: string) => {
-    if (confirm('Are you sure you want to delete this movie? All associated showtimes will also be deleted.')) {
-      deleteMovie(id);
-      toast.success('Movie deleted successfully');
+  const handleDeleteMovie = async (id: number) => {
+    if (confirm("Are you sure you want to delete this movie?")) {
+      await axios.delete(`${MOVIES_API}/${id}`);
+      toast.success("Movie deleted");
+      fetchMovies();
     }
   };
 
-  const handleAddShowtime = () => {
-    if (!showtimeForm.movieId || !showtimeForm.time || !showtimeForm.date || !showtimeForm.totalSeats || !showtimeForm.price) {
-      toast.error('Please fill all required fields');
+  // ------------------- SHOWTIMES CRUD (existing working code) -------------------
+  const handleAddOrEditShowtime = async () => {
+    if (!showtimeForm.movieId || !showtimeForm.date || !showtimeForm.time) {
+      toast.error("Please fill all required fields");
       return;
     }
 
-    const showtimeData = {
+    const data = {
       ...showtimeForm,
-      totalSeats: parseInt(showtimeForm.totalSeats),
-      availableSeats: parseInt(showtimeForm.totalSeats),
-      price: parseFloat(showtimeForm.price),
+      movieId: Number(showtimeForm.movieId),
+      totalSeats: Number(showtimeForm.totalSeats),
+      availableSeats:
+        Number(showtimeForm.availableSeats) || Number(showtimeForm.totalSeats),
+      price: Number(showtimeForm.price) || 0,
     };
 
-    if (editingShowtime) {
-      updateShowtime(editingShowtime.id, {
-        ...showtimeData,
-        availableSeats: editingShowtime.availableSeats,
-      });
-      toast.success('Showtime updated successfully');
-    } else {
-      addShowtime(showtimeData);
-      toast.success('Showtime added successfully');
+    try {
+      if (editingShowtime) {
+        await axios.put(`${SHOWTIMES_API}/${editingShowtime.id}`, data);
+        toast.success("Showtime updated successfully");
+      } else {
+        await axios.post(SHOWTIMES_API, data);
+        toast.success("Showtime added successfully");
+      }
+      setEditingShowtime(null);
+      setIsShowtimeDialogOpen(false);
+      fetchShowtimes();
+    } catch {
+      toast.error("Error saving showtime");
     }
-
-    setShowtimeForm({ movieId: '', time: '', date: '', totalSeats: '', price: '' });
-    setEditingShowtime(null);
-    setIsShowtimeDialogOpen(false);
   };
 
-  const handleEditShowtime = (showtime: Showtime) => {
-    setEditingShowtime(showtime);
+  const handleEditShowtime = (s: Showtime) => {
+    setEditingShowtime(s);
     setShowtimeForm({
-      movieId: showtime.movieId,
-      time: showtime.time,
-      date: showtime.date,
-      totalSeats: showtime.totalSeats.toString(),
-      price: showtime.price.toString(),
+      movieId: s.movieId.toString(),
+      date: s.date || "",
+      time: s.time || "",
+      totalSeats: s.totalSeats?.toString() || "",
+      availableSeats: s.availableSeats?.toString() || "",
+      price: s.price?.toString() || "",
     });
     setIsShowtimeDialogOpen(true);
   };
 
-  const handleDeleteShowtime = (id: string) => {
-    if (confirm('Are you sure you want to delete this showtime?')) {
-      deleteShowtime(id);
-      toast.success('Showtime deleted successfully');
+  const handleDeleteShowtime = async (id: number) => {
+    if (confirm("Are you sure you want to delete this showtime?")) {
+      await axios.delete(`${SHOWTIMES_API}/${id}`);
+      toast.success("Showtime deleted");
+      fetchShowtimes();
     }
   };
 
+  // ------------------- USERS CRUD (new tab, isolated) -------------------
+  const handleAddOrEditUser = async () => {
+    if (!userForm.name || !userForm.email || (!editingUser && !userForm.password)) {
+      toast.error("Please fill all required fields");
+      return;
+    }
+
+    try {
+      if (editingUser) {
+        // Update user (do not send password if empty)
+        const payload: any = { name: userForm.name, email: userForm.email, role: userForm.role };
+        await axios.put(`${USERS_API}/${editingUser.id}`, payload);
+        toast.success("User updated successfully");
+      } else {
+        // Create user - backend expects password field for registration
+        const payload: any = { name: userForm.name, email: userForm.email, password: userForm.password, role: userForm.role };
+        await axios.post(USERS_API, payload);
+        toast.success("User added successfully");
+      }
+      setEditingUser(null);
+      setUserForm({ name: "", email: "", password: "", role: "USER" });
+      setIsUserDialogOpen(false);
+      fetchUsers();
+    } catch (err) {
+      console.error("User save error:", err);
+      toast.error("Error saving user");
+    }
+  };
+
+  const handleEditUser = (u: UserType) => {
+    setEditingUser(u);
+    setUserForm({ name: u.name, email: u.email, password: "", role: u.role });
+    setIsUserDialogOpen(true);
+  };
+
+  const handleDeleteUser = async (id: number) => {
+    if (confirm("Are you sure you want to delete this user?")) {
+      await axios.delete(`${USERS_API}/${id}`);
+      toast.success("User deleted");
+      fetchUsers();
+    }
+  };
+
+  // ------------------- RENDER -------------------
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent mb-2">
-            Admin Dashboard
-          </h1>
-          <p className="text-muted-foreground">Manage movies, showtimes, and reservations</p>
-        </div>
+        <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent mb-2">
+          Admin Dashboard
+        </h1>
+        <p className="text-muted-foreground mb-8">Manage Movies & Showtimes</p>
 
         <Tabs defaultValue="movies" className="space-y-6">
           <TabsList className="bg-card/50">
             <TabsTrigger value="movies">Movies</TabsTrigger>
             <TabsTrigger value="showtimes">Showtimes</TabsTrigger>
-            <TabsTrigger value="reservations">Reservations</TabsTrigger>
+            <TabsTrigger value="users">Users</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="movies" className="space-y-4">
+          {/* ---------------- MOVIES TAB (unchanged) ---------------- */}
+          <TabsContent value="movies">
             <Card className="p-6 bg-card/50 border-border/50">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-foreground">Movies</h2>
                 <Dialog open={isMovieDialogOpen} onOpenChange={setIsMovieDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button variant="cinema" onClick={() => { setEditingMovie(null); setMovieForm({ title: '', genre: '', duration: '', rating: '', poster: '', description: '' }); }}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Movie
+                    <Button
+                      variant="cinema"
+                      onClick={() => {
+                        setEditingMovie(null);
+                        setMovieForm({
+                          title: "",
+                          genre: "",
+                          description: "",
+                          durationMinutes: "",
+                          rating: "",
+                          posterUrl: "",
+                          language: "",
+                          releaseDate: "",
+                        });
+                      }}
+                    >
+                      <Plus className="w-4 h-4 mr-2" /> Add Movie
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="bg-card max-w-2xl">
                     <DialogHeader>
-                      <DialogTitle>{editingMovie ? 'Edit Movie' : 'Add New Movie'}</DialogTitle>
+                      <DialogTitle>{editingMovie ? "Edit Movie" : "Add New Movie"}</DialogTitle>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
-                      <div className="grid gap-2">
-                        <Label htmlFor="title">Title *</Label>
-                        <Input id="title" value={movieForm.title} onChange={(e) => setMovieForm({ ...movieForm, title: e.target.value })} />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="grid gap-2">
-                          <Label htmlFor="genre">Genre *</Label>
-                          <Input id="genre" value={movieForm.genre} onChange={(e) => setMovieForm({ ...movieForm, genre: e.target.value })} />
+                      {[
+                        { id: "title", label: "Title", type: "text", required: true },
+                        { id: "genre", label: "Genre", type: "text", required: true },
+                        { id: "durationMinutes", label: "Duration (mins)", type: "number" },
+                        { id: "rating", label: "Rating", type: "number" },
+                        { id: "language", label: "Language", type: "text" },
+                        { id: "releaseDate", label: "Release Date", type: "date" },
+                        { id: "posterUrl", label: "Poster URL", type: "text" },
+                      ].map((field) => (
+                        <div key={field.id} className="grid gap-2">
+                          <Label htmlFor={field.id}>{field.label}{field.required ? ' *' : ''}</Label>
+                          <Input
+                            id={field.id}
+                            type={field.type}
+                            value={(movieForm as any)[field.id]}
+                            onChange={(e) => setMovieForm({ ...movieForm, [field.id]: e.target.value })}
+                          />
                         </div>
-                        <div className="grid gap-2">
-                          <Label htmlFor="duration">Duration (mins) *</Label>
-                          <Input id="duration" type="number" value={movieForm.duration} onChange={(e) => setMovieForm({ ...movieForm, duration: e.target.value })} />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="grid gap-2">
-                          <Label htmlFor="rating">Rating *</Label>
-                          <Input id="rating" type="number" step="0.1" max="10" value={movieForm.rating} onChange={(e) => setMovieForm({ ...movieForm, rating: e.target.value })} />
-                        </div>
-                        <div className="grid gap-2">
-                          <Label htmlFor="poster">Poster URL</Label>
-                          <Input id="poster" value={movieForm.poster} onChange={(e) => setMovieForm({ ...movieForm, poster: e.target.value })} />
-                        </div>
-                      </div>
+                      ))}
+
                       <div className="grid gap-2">
                         <Label htmlFor="description">Description</Label>
-                        <Input id="description" value={movieForm.description} onChange={(e) => setMovieForm({ ...movieForm, description: e.target.value })} />
+                        <Input
+                          id="description"
+                          value={movieForm.description}
+                          onChange={(e) => setMovieForm({ ...movieForm, description: e.target.value })}
+                        />
                       </div>
-                      <Button onClick={handleAddMovie} variant="cinema">{editingMovie ? 'Update' : 'Add'} Movie</Button>
+
+                      <Button onClick={handleAddOrEditMovie} variant="cinema">
+                        {editingMovie ? 'Update' : 'Add'} Movie
+                      </Button>
                     </div>
                   </DialogContent>
                 </Dialog>
               </div>
 
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Genre</TableHead>
-                    <TableHead>Duration</TableHead>
-                    <TableHead>Rating</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {movies.map((movie) => (
-                    <TableRow key={movie.id}>
-                      <TableCell className="font-medium">{movie.title}</TableCell>
-                      <TableCell>{movie.genre}</TableCell>
-                      <TableCell>{movie.duration} min</TableCell>
-                      <TableCell>{movie.rating}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm" onClick={() => handleEditMovie(movie)}>
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button variant="destructive" size="sm" onClick={() => handleDeleteMovie(movie.id)}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+              {loading ? (
+                <div className="flex justify-center py-10">
+                  <Loader2 className="animate-spin text-accent w-8 h-8" />
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Genre</TableHead>
+                      <TableHead>Duration</TableHead>
+                      <TableHead>Rating</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {movies.length > 0 ? (
+                      movies.map((movie) => (
+                        <TableRow key={movie.id}>
+                          <TableCell className="font-medium">{movie.title}</TableCell>
+                          <TableCell>{movie.genre}</TableCell>
+                          <TableCell>{movie.durationMinutes} min</TableCell>
+                          <TableCell>{movie.rating}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button variant="outline" size="sm" onClick={() => handleEditMovie(movie)}>
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button variant="destructive" size="sm" onClick={() => handleDeleteMovie(movie.id)}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground">
+                          No movies available
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
             </Card>
           </TabsContent>
 
+          {/* ---------------- SHOWTIMES TAB (unchanged) ---------------- */}
           <TabsContent value="showtimes" className="space-y-4">
             <Card className="p-6 bg-card/50 border-border/50">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-foreground">Showtimes</h2>
                 <Dialog open={isShowtimeDialogOpen} onOpenChange={setIsShowtimeDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button variant="cinema" onClick={() => { setEditingShowtime(null); setShowtimeForm({ movieId: '', time: '', date: '', totalSeats: '', price: '' }); }}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Showtime
+                    <Button
+                      variant="cinema"
+                      onClick={() => {
+                        setEditingShowtime(null);
+                        setShowtimeForm({
+                          movieId: "",
+                          date: "",
+                          time: "",
+                          totalSeats: "",
+                          availableSeats: "",
+                          price: "",
+                        });
+                      }}
+                    >
+                      <Plus className="w-4 h-4 mr-2" /> Add Showtime
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="bg-card">
+
+                  <DialogContent className="bg-card max-w-lg">
                     <DialogHeader>
-                      <DialogTitle>{editingShowtime ? 'Edit Showtime' : 'Add New Showtime'}</DialogTitle>
+                      <DialogTitle>{editingShowtime ? "Edit Showtime" : "Add Showtime"}</DialogTitle>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
-                      <div className="grid gap-2">
-                        <Label htmlFor="movieId">Movie *</Label>
-                        <select
-                          id="movieId"
-                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                          value={showtimeForm.movieId}
-                          onChange={(e) => setShowtimeForm({ ...showtimeForm, movieId: e.target.value })}
-                        >
-                          <option value="">Select a movie</option>
-                          {movies.map((movie) => (
-                            <option key={movie.id} value={movie.id}>{movie.title}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="grid gap-2">
-                          <Label htmlFor="date">Date *</Label>
-                          <Input id="date" type="date" value={showtimeForm.date} onChange={(e) => setShowtimeForm({ ...showtimeForm, date: e.target.value })} />
+                      <Label htmlFor="movieId">Movie</Label>
+                      <select
+                        id="movieId"
+                        className="p-2 border rounded"
+                        value={showtimeForm.movieId}
+                        onChange={(e) => setShowtimeForm({ ...showtimeForm, movieId: e.target.value })}
+                      >
+                        <option value="">Select Movie</option>
+                        {movies.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.title}
+                          </option>
+                        ))}
+                      </select>
+
+                      {["date", "time", "totalSeats", "availableSeats", "price"].map((field) => (
+                        <div key={field} className="grid gap-2">
+                          <Label htmlFor={field}>{field}</Label>
+                          <Input
+                            id={field}
+                            type={field.includes("Seats") || field === "price" ? "number" : field}
+                            value={(showtimeForm as any)[field]}
+                            onChange={(e) => setShowtimeForm({ ...showtimeForm, [field]: e.target.value })}
+                          />
                         </div>
-                        <div className="grid gap-2">
-                          <Label htmlFor="time">Time *</Label>
-                          <Input id="time" type="time" value={showtimeForm.time} onChange={(e) => setShowtimeForm({ ...showtimeForm, time: e.target.value })} />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="grid gap-2">
-                          <Label htmlFor="totalSeats">Total Seats *</Label>
-                          <Input id="totalSeats" type="number" value={showtimeForm.totalSeats} onChange={(e) => setShowtimeForm({ ...showtimeForm, totalSeats: e.target.value })} />
-                        </div>
-                        <div className="grid gap-2">
-                          <Label htmlFor="price">Price ($) *</Label>
-                          <Input id="price" type="number" step="0.01" value={showtimeForm.price} onChange={(e) => setShowtimeForm({ ...showtimeForm, price: e.target.value })} />
-                        </div>
-                      </div>
-                      <Button onClick={handleAddShowtime} variant="cinema">{editingShowtime ? 'Update' : 'Add'} Showtime</Button>
+                      ))}
+
+                      <Button onClick={handleAddOrEditShowtime} variant="cinema">
+                        {editingShowtime ? "Update" : "Add"} Showtime
+                      </Button>
                     </div>
                   </DialogContent>
                 </Dialog>
@@ -306,27 +498,48 @@ const AdminDashboard = () => {
                     <TableHead>Movie</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Time</TableHead>
-                    <TableHead>Available Seats</TableHead>
+                    <TableHead>Seats</TableHead>
                     <TableHead>Price</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {showtimes.map((showtime) => {
-                    const movie = movies.find(m => m.id === showtime.movieId);
+                  {showtimes.map((s) => {
+                    const movie = movies.find((m) => m.id === s.movieId);
                     return (
-                      <TableRow key={showtime.id}>
-                        <TableCell className="font-medium">{movie?.title}</TableCell>
-                        <TableCell>{showtime.date}</TableCell>
-                        <TableCell>{showtime.time}</TableCell>
-                        <TableCell>{showtime.availableSeats}/{showtime.totalSeats}</TableCell>
-                        <TableCell>${showtime.price}</TableCell>
+                      <TableRow key={s.id}>
+                        <TableCell>{movie?.title}</TableCell>
+                        <TableCell>{s.date}</TableCell>
+                        <TableCell>{s.time}</TableCell>
+                        <TableCell>
+                          {s.availableSeats}/{s.totalSeats}
+                        </TableCell>
+                        <TableCell>${s.price}</TableCell>
                         <TableCell>
                           <div className="flex gap-2">
-                            <Button variant="outline" size="sm" onClick={() => handleEditShowtime(showtime)}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setEditingShowtime(s);
+                                setShowtimeForm({
+                                  movieId: s.movieId?.toString() || "",
+                                  date: s.date || "",
+                                  time: s.time || "",
+                                  totalSeats: s.totalSeats?.toString() || "",
+                                  availableSeats: s.availableSeats?.toString() || "",
+                                  price: s.price?.toString() || "",
+                                });
+                                setIsShowtimeDialogOpen(true);
+                              }}
+                            >
                               <Edit className="w-4 h-4" />
                             </Button>
-                            <Button variant="destructive" size="sm" onClick={() => handleDeleteShowtime(showtime.id)}>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleDeleteShowtime(s.id)}
+                            >
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
@@ -339,37 +552,84 @@ const AdminDashboard = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="reservations" className="space-y-4">
+          {/* ---------------- USERS TAB (NEW) ---------------- */}
+          <TabsContent value="users" className="space-y-4">
             <Card className="p-6 bg-card/50 border-border/50">
-              <h2 className="text-2xl font-bold text-foreground mb-6">All Reservations</h2>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-foreground">Users</h2>
+                <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="cinema"
+                      onClick={() => {
+                        setEditingUser(null);
+                        setUserForm({ name: "", email: "", password: "", role: "USER" });
+                      }}
+                    >
+                      <Plus className="w-4 h-4 mr-2" /> Add User
+                    </Button>
+                  </DialogTrigger>
+
+                  <DialogContent className="bg-card max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>{editingUser ? "Edit User" : "Add User"}</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <Label htmlFor="userName">Name</Label>
+                      <Input id="userName" value={userForm.name} onChange={(e) => setUserForm({ ...userForm, name: e.target.value })} />
+                      <Label htmlFor="userEmail">Email</Label>
+                      <Input id="userEmail" value={userForm.email} onChange={(e) => setUserForm({ ...userForm, email: e.target.value })} />
+                      {!editingUser && (
+                        <>
+                          <Label htmlFor="userPassword">Password</Label>
+                          <Input id="userPassword" type="password" value={userForm.password} onChange={(e) => setUserForm({ ...userForm, password: e.target.value })} />
+                        </>
+                      )}
+                      <Label>Role</Label>
+                      <select className="p-2 border rounded" value={userForm.role} onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}>
+                        <option value="USER">User</option>
+                        <option value="ADMIN">Admin</option>
+                      </select>
+
+                      <Button onClick={handleAddOrEditUser} variant="cinema">
+                        {editingUser ? "Update" : "Add"} User
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Reservation ID</TableHead>
-                    <TableHead>User ID</TableHead>
-                    <TableHead>Movie</TableHead>
-                    <TableHead>Showtime</TableHead>
-                    <TableHead>Seats</TableHead>
-                    <TableHead>Total Price</TableHead>
-                    <TableHead>Booking Date</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {reservations.map((reservation) => (
-                    <TableRow key={reservation.id}>
-                      <TableCell>{reservation.id}</TableCell>
-                      <TableCell>{reservation.userId}</TableCell>
-                      <TableCell className="font-medium">{reservation.movieTitle}</TableCell>
-                      <TableCell>{reservation.showtime}</TableCell>
-                      <TableCell>{reservation.seats}</TableCell>
-                      <TableCell>${reservation.totalPrice.toFixed(2)}</TableCell>
-                      <TableCell>{new Date(reservation.bookingDate).toLocaleDateString()}</TableCell>
+                  {users.map((u) => (
+                    <TableRow key={u.id}>
+                      <TableCell>{u.name}</TableCell>
+                      <TableCell>{u.email}</TableCell>
+                      <TableCell>{u.role}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" onClick={() => handleEditUser(u)}>
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button size="sm" variant="destructive" onClick={() => handleDeleteUser(u.id)}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))}
-                  {reservations.length === 0 && (
+                  {users.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground">
-                        No reservations yet
+                      <TableCell colSpan={4} className="text-center text-muted-foreground">
+                        No users found
                       </TableCell>
                     </TableRow>
                   )}

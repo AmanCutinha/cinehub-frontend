@@ -4,8 +4,8 @@ import { User } from "@/types";
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
-  register: (name: string, email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string, role?: "admin" | "user") => Promise<boolean>;
+  register: (name: string, email: string, password: string, role?: "admin" | "user") => Promise<boolean>;
   logout: () => void;
   isAuthenticated: boolean;
 }
@@ -23,24 +23,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (email: string, password: string, role?: "admin" | "user"): Promise<boolean> => {
     try {
-      const res = await axios.post(`${API_BASE}/login`, { email, password });
-      setUser(res.data);
-      localStorage.setItem("cinehub_user", JSON.stringify(res.data));
-      return true;
+      const res = await axios.post(`${API_BASE}/login`, { email, password, role });
+      if (res.data) {
+        setUser(res.data);
+        localStorage.setItem("cinehub_user", JSON.stringify(res.data));
+        return true;
+      }
+      return false;
     } catch (err) {
       console.error("Login failed:", err);
       return false;
     }
   };
 
-  const register = async (name: string, email: string, password: string): Promise<boolean> => {
+  const register = async (
+    name: string,
+    email: string,
+    password: string,
+    role: "admin" | "user" = "user"
+  ): Promise<boolean> => {
     try {
-      const res = await axios.post(`${API_BASE}/register`, { name, email, password });
-      setUser(res.data);
-      localStorage.setItem("cinehub_user", JSON.stringify(res.data));
-      return true;
+      const res = await axios.post(`${API_BASE}/register`, { name, email, password, role });
+      if (res.data) {
+        setUser(res.data);
+        localStorage.setItem("cinehub_user", JSON.stringify(res.data));
+        return true;
+      }
+      return false;
     } catch (err) {
       console.error("Registration failed:", err);
       return false;
