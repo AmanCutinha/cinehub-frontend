@@ -15,6 +15,7 @@ export const Navbar = () => {
   return (
     <nav className="w-full bg-card/70 backdrop-blur-md border-b border-border/50 shadow-sm sticky top-0 z-50">
       <div className="container mx-auto flex items-center justify-between py-3 px-4">
+        {/* Logo */}
         <div
           className="flex items-center gap-2 cursor-pointer"
           onClick={() => navigate("/")}
@@ -23,11 +24,24 @@ export const Navbar = () => {
           <h1 className="font-bold text-lg text-foreground">CineHub</h1>
         </div>
 
+        {/* Nav links */}
         <div className="flex items-center gap-4">
           <Link to="/" className="text-foreground hover:text-accent transition">
             Home
           </Link>
-          {isAuthenticated && (
+
+          {/* Admin link (only visible to admins) */}
+          {isAuthenticated && user?.role === "admin" && (
+            <Link
+              to="/admin"
+              className="text-foreground hover:text-accent transition"
+            >
+              Admin Dashboard
+            </Link>
+          )}
+
+          {/* Regular user dashboard link */}
+          {isAuthenticated && user?.role !== "admin" && (
             <Link
               to="/user"
               className="text-foreground hover:text-accent transition"
@@ -36,8 +50,13 @@ export const Navbar = () => {
             </Link>
           )}
 
+          {/* Auth buttons */}
           {!isAuthenticated ? (
-            <Button variant="cinema" size="sm" onClick={() => navigate("/auth?mode=login")}>
+            <Button
+              variant="cinema"
+              size="sm"
+              onClick={() => navigate("/auth?mode=login")}
+            >
               Login
             </Button>
           ) : (
