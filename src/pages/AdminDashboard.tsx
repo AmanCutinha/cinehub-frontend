@@ -30,6 +30,7 @@ import { Movie } from "@/types";
 const MOVIES_API = "http://localhost:8081/api/movies";
 const SHOWTIMES_API = "http://localhost:8081/api/showtimes";
 const USERS_API = "http://localhost:8081/api/users";
+const BOOKINGS_API = "http://localhost:8081/api/bookings";
 
 interface Showtime {
   id: number;
@@ -48,6 +49,19 @@ interface UserType {
   role: string;
 }
 
+interface BookingType {
+  id: number;
+  userEmail: string;
+  movie: {
+    id: number;
+    title: string;
+    // other movie fields may exist but we only need title here
+  };
+  seats: number;
+  totalPrice: number;
+  bookingTime: string; // ISO string from backend
+}
+
 const AdminDashboard = () => {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -55,6 +69,7 @@ const AdminDashboard = () => {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [showtimes, setShowtimes] = useState<Showtime[]>([]);
   const [users, setUsers] = useState<UserType[]>([]);
+  const [bookings, setBookings] = useState<BookingType[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Movie dialog
@@ -93,7 +108,7 @@ const AdminDashboard = () => {
     role: "USER",
   });
 
-  // Fetch movies & showtimes & users
+  // Fetch movies & showtimes & users & bookings
   const fetchMovies = async () => {
     try {
       setLoading(true);
@@ -124,6 +139,15 @@ const AdminDashboard = () => {
     }
   };
 
+  const fetchBookings = async () => {
+    try {
+      const res = await axios.get(BOOKINGS_API);
+      setBookings(res.data);
+    } catch {
+      toast.error("Failed to fetch bookings");
+    }
+  };
+
   useEffect(() => {
     if (!isAuthenticated || !user || user.role !== "admin") {
       navigate("/");
@@ -131,6 +155,7 @@ const AdminDashboard = () => {
       fetchMovies();
       fetchShowtimes();
       fetchUsers();
+      fetchBookings();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, user, navigate]);
@@ -294,6 +319,19 @@ const AdminDashboard = () => {
     }
   };
 
+  // ------------------- BOOKINGS CRUD (new tab) -------------------
+  const handleDeleteBooking = async (id: number) => {
+    if (!confirm("Delete this booking?")) return;
+    try {
+      await axios.delete(`${BOOKINGS_API}/${id}`);
+      toast.success("Booking deleted");
+      fetchBookings();
+    } catch (err) {
+      console.error("Failed to delete booking:", err);
+      toast.error("Failed to delete booking");
+    }
+  };
+
   // ------------------- RENDER -------------------
   return (
     <div className="min-h-screen bg-background">
@@ -309,6 +347,7 @@ const AdminDashboard = () => {
             <TabsTrigger value="movies">Movies</TabsTrigger>
             <TabsTrigger value="showtimes">Showtimes</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="bookings">Bookings</TabsTrigger>
           </TabsList>
 
           {/* ---------------- MOVIES TAB (unchanged) ---------------- */}
@@ -630,6 +669,61 @@ const AdminDashboard = () => {
                     <TableRow>
                       <TableCell colSpan={4} className="text-center text-muted-foreground">
                         No users found
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </Card>
+          </TabsContent>
+
+          {/* ---------------- BOOKINGS TAB (NEW) ---------------- */}
+          <TabsContent value="bookings" className="space-y-4">
+            <Card className="p-6 bg-card/50 border-border/50">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-foreground">Bookings</h2>
+                <div>
+                  <Button variant="cinema" onClick={() => fetchBookings()}>
+                    Refresh
+                  </Button>
+                </div>
+              </div>
+
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Reservation ID</TableHead>
+                    <TableHead>User Email</TableHead>
+                    <TableHead>Movie</TableHead>
+                    <TableHead>Seats</TableHead>
+                    <TableHead>Total Price</TableHead>
+                    <TableHead>Booking Time</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {bookings.length > 0 ? (
+                    bookings.map((b) => (
+                      <TableRow key={b.id}>
+                        <TableCell>{b.id}</TableCell>
+                        <TableCell>{b.userEmail}</TableCell>
+                        <TableCell className="font-medium">{b.movie?.title}</TableCell>
+                        <TableCell>{b.seats}</TableCell>
+                        <TableCell>${b.totalPrice.toFixed(2)}</TableCell>
+                        <TableCell>{new Date(b.bookingTime).toLocaleString()}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="destructive" onClick={() => handleDeleteBooking(b.id)}>
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center text-muted-foreground">
+                        No bookings found
                       </TableCell>
                     </TableRow>
                   )}
