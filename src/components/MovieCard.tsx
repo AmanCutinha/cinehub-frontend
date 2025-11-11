@@ -12,15 +12,9 @@ interface MovieCardProps {
 
 export const MovieCard = ({ movie, showtimes }: MovieCardProps) => {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { user } = useAuth();
 
-  const handleBooking = (showtimeId: number) => {
-    if (!isAuthenticated) {
-      navigate("/auth?mode=login");
-    } else {
-      navigate(`/booking/${movie.id}/${showtimeId}`);
-    }
-  };
+  const isAdmin = user?.role === "admin";
 
   return (
     <Card className="overflow-hidden bg-card border border-border/50 shadow-card hover:shadow-xl hover:scale-[1.02] transition-all duration-300">
@@ -66,21 +60,32 @@ export const MovieCard = ({ movie, showtimes }: MovieCardProps) => {
           </p>
           <div className="flex flex-wrap gap-2">
             {showtimes.length > 0 ? (
-              showtimes.slice(0, 3).map((showtime) => (
-                <Button
-                  key={showtime.id}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleBooking(showtime.id)}
-                  className="text-xs hover:bg-accent hover:text-accent-foreground transition-colors"
-                >
-                  {showtime.time?.slice(0, 5) || "N/A"}
-                </Button>
-              ))
+              showtimes.slice(0, 3).map((showtime) => {
+                const label = showtime.time?.slice(0, 5) ?? showtime.time ?? "Time";
+                return (
+                  <Button
+                    key={showtime.id}
+                    variant={isAdmin ? "ghost" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      if (isAdmin) return;
+                      navigate(`/booking/${movie.id}/${showtime.id}`);
+                    }}
+                    className={`text-xs ${isAdmin ? "opacity-60 cursor-not-allowed" : "hover:bg-accent hover:text-accent-foreground transition-colors"}`}
+                    disabled={isAdmin}
+                    title={isAdmin ? "Admins cannot book tickets" : `Book ${label}`}
+                  >
+                    {label}
+                  </Button>
+                );
+              })
             ) : (
               <p className="text-xs text-muted-foreground italic">No showtimes available</p>
             )}
           </div>
+          {isAdmin && (
+            <p className="text-xs text-muted-foreground mt-1 italic">You are an admin — booking is disabled.</p>
+          )}
         </div>
       </div>
     </Card>

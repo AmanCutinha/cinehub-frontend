@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMovies } from "@/contexts/MovieContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { Navbar } from "@/components/Navbar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,14 +11,16 @@ import { toast } from "sonner";
 import { createBooking } from "@/services/bookingService";
 
 const Booking = () => {
-  const { movieId } = useParams();
+  const { movieId } = useParams<{ movieId?: string }>();
   const navigate = useNavigate();
   const { movies } = useMovies();
+  const { user, isAuthenticated } = useAuth();
 
   const [selectedSeats, setSelectedSeats] = useState(1);
   const [pricePerSeat] = useState(250); // static for now
   const [availableSeats] = useState(50); // mock until backend connects
 
+  // Find movie by id (movieId from route is string, movie.id is number)
   const movie = movies.find((m) => m.id === Number(movieId));
 
   useEffect(() => {
@@ -25,6 +28,9 @@ const Booking = () => {
       toast.error("Movie not found!");
     }
   }, [movie]);
+
+  // Prevent admins from booking — treat role case-insensitively
+  const isAdmin = Boolean(user?.role && user.role.toString().toLowerCase() === "admin");
 
   if (!movie) {
     return (
@@ -52,24 +58,37 @@ const Booking = () => {
   };
 
   const handleBooking = async () => {
-  try {
-    const bookingData = {
-      movieId: movie.id,
-      userEmail: "aman@example.com", // temporary placeholder (later from auth)
-      seats: selectedSeats,
-      totalPrice: totalPrice,
-    };
+    // if not logged in, ask to login
+    if (!isAuthenticated || !user) {
+      toast.error("Please login to book tickets");
+      navigate("/auth?mode=login");
+      return;
+    }
 
-    const response = await createBooking(bookingData);
-    toast.success(`🎟️ Booking confirmed for ${movie.title}!`);
-    console.log("Booking saved:", response);
+    // block admin users
+    if (isAdmin) {
+      toast.error("Admins cannot book tickets. Redirecting to admin dashboard.");
+      navigate("/admin");
+      return;
+    }
 
-    navigate("/user");
-  } catch (error) {
-    toast.error("Failed to create booking. Try again.");
-    console.error(error);
-  }
-};
+    try {
+      const bookingData = {
+        movieId: movie.id,
+        userEmail: user.email, // from auth context
+        seats: selectedSeats,
+        totalPrice: totalPrice,
+      };
+
+      const response = await createBooking(bookingData);
+      toast.success(`🎟️ Booking confirmed for ${movie.title}!`);
+      console.log("Booking saved:", response);
+      navigate("/user");
+    } catch (error) {
+      toast.error("Failed to create booking. Try again.");
+      console.error("createBooking error:", error);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -87,8 +106,8 @@ const Booking = () => {
                 <div className="aspect-[2/3] overflow-hidden rounded-lg">
                   <img
                     src={
-                      movie.posterUrl ||
-                      "https://via.placeholder.com/400x600?text=No+Poster"
+                      // support both posterUrl and poster (in case backend field differs)
+                      (movie as any).posterUrl || (movie as any).poster || "https://via.placeholder.com/400x600?text=No+Poster"
                     }
                     alt={movie.title}
                     className="w-full h-full object-cover"
@@ -105,10 +124,10 @@ const Booking = () => {
                     </span>
                     <span className="flex items-center gap-1">
                       <Clock className="w-4 h-4" />
-                      {movie.durationMinutes || "N/A"} min
+                      {movie.durationMinutes ?? "N/A"} min
                     </span>
                     <span className="flex items-center gap-1">
-                      ⭐ {movie.rating || "N/A"}/10
+                      ⭐ {movie.rating ?? "N/A"}/10
                     </span>
                   </div>
 
@@ -213,8 +232,10 @@ const Booking = () => {
                 size="lg"
                 className="w-full"
                 onClick={handleBooking}
+                disabled={isAdmin} // admins can't book
+                title={isAdmin ? "Admins cannot book tickets" : undefined}
               >
-                Confirm Booking
+                {isAdmin ? "Admins cannot book" : "Confirm Booking"}
               </Button>
             </Card>
           </div>
