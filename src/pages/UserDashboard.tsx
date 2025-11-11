@@ -5,41 +5,41 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Ticket, Calendar, DollarSign } from "lucide-react";
-import { getBookingsByUser } from "@/services/bookingService";
 import { toast } from "sonner";
-
-interface Booking {
-  id: number;
-  userEmail: string;
-  movie: {
-    title: string;
-    genre: string;
-    rating: number;
-  };
-  seats: number;
-  totalPrice: number;
-  bookingTime: string;
-}
+import { useMovies } from "@/contexts/MovieContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 const UserDashboard = () => {
   const navigate = useNavigate();
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const userEmail = "aman@example.com"; // temporary placeholder (will be dynamic once Auth is done)
+  const { reservations, fetchReservations, getUserReservationsByEmail } = useMovies();
+  const { user } = useAuth();
+
+  const userEmail = user?.email ?? "";
+  const [bookings, setBookings] = useState<typeof reservations>([]);
 
   useEffect(() => {
-    const fetchUserBookings = async () => {
+    // ensure we have latest reservations from backend
+    (async () => {
       try {
-        const data = await getBookingsByUser(userEmail);
-        setBookings(data);
-      } catch (error) {
-        toast.error("Failed to load bookings.");
+        await fetchReservations();
+      } catch (err) {
+        toast.error("Failed to load reservations");
       }
-    };
-    fetchUserBookings();
-  }, [userEmail]);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const totalSpent = bookings.reduce((sum, b) => sum + b.totalPrice, 0);
-  const uniqueMovies = new Set(bookings.map(b => b.movie.title)).size;
+  useEffect(() => {
+    if (!userEmail) {
+      setBookings([]);
+      return;
+    }
+    const userBookings = getUserReservationsByEmail(userEmail);
+    setBookings(userBookings);
+  }, [reservations, userEmail, getUserReservationsByEmail]);
+
+  const totalSpent = bookings.reduce((sum, b) => sum + (b.totalPrice || 0), 0);
+  const uniqueMovies = new Set(bookings.map(b => b.movie?.title)).size;
 
   return (
     <div className="min-h-screen bg-background">
@@ -50,10 +50,12 @@ const UserDashboard = () => {
           <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent mb-2">
             My Dashboard
           </h1>
-          <p className="text-muted-foreground">Welcome back, Aman!</p>
+          <p className="text-muted-foreground">
+            Welcome back{user?.name ? `, ${user.name.split(" ")[0]}` : "!"}
+          </p>
         </div>
 
-        {/* Dashboard Summary Cards */}
+        {/* Summary */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card className="p-6 bg-gradient-card border-border/50 shadow-card">
             <div className="flex items-center gap-4">
@@ -115,8 +117,8 @@ const UserDashboard = () => {
               <TableBody>
                 {bookings.map((b) => (
                   <TableRow key={b.id}>
-                    <TableCell className="font-medium">{b.movie.title}</TableCell>
-                    <TableCell>{b.movie.genre}</TableCell>
+                    <TableCell className="font-medium">{b.movie?.title}</TableCell>
+                    <TableCell>{b.movie?.genre}</TableCell>
                     <TableCell>{b.seats}</TableCell>
                     <TableCell>₹{b.totalPrice}</TableCell>
                     <TableCell>{new Date(b.bookingTime).toLocaleString()}</TableCell>

@@ -8,12 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Minus, Plus, Calendar, Clock, DollarSign } from "lucide-react";
 import { toast } from "sonner";
-import { createBooking } from "@/services/bookingService";
 
 const Booking = () => {
   const { movieId } = useParams<{ movieId?: string }>();
   const navigate = useNavigate();
-  const { movies } = useMovies();
+  const { movies, addReservation } = useMovies();
   const { user, isAuthenticated } = useAuth();
 
   const [selectedSeats, setSelectedSeats] = useState(1);
@@ -80,9 +79,15 @@ const Booking = () => {
         totalPrice: totalPrice,
       };
 
-      const response = await createBooking(bookingData);
-      toast.success(`🎟️ Booking confirmed for ${movie.title}!`);
-      console.log("Booking saved:", response);
+      // Use MovieContext's addReservation so local state updates instantly
+      const created = await addReservation(bookingData);
+      if (created) {
+        toast.success(`🎟️ Booking confirmed for ${movie.title}!`);
+      } else {
+        // fallback success message if backend didn't return object
+        toast.success(`🎟️ Booking confirmed for ${movie.title}!`);
+      }
+
       navigate("/user");
     } catch (error) {
       toast.error("Failed to create booking. Try again.");
